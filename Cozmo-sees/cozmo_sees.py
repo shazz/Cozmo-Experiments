@@ -20,22 +20,18 @@ USE_LOGGING = False
 USE_FILTER = True
 CUBE_SEARCH_TIMEOUT = 3
 DISPLAY_TEXT_DURATION = 0.75
-# Note: To use a custom font, uncomment the below line, set path/size, and restore font parameter on line 59.
-# FONT = PIL.ImageFont.truetype("./fonts/Avenir-Roman.ttf", 24)
 PURPLE = cozmo.lights.Color(rgba=(138, 43, 226 , 255))
 GREEN = cozmo.lights.Color(rgba=(0, 255, 0, 255))
 ORANGE = cozmo.lights.Color(rgba=(255, 165, 0, 255))
 
-# Constants
-FILTERED = frozenset(["black and white", "monochrome photography", "black", "white", "monochrome", "image", "photography"])
-
-
 '''
 Cozmo Sees
--Experimenting with Cozmo's camera and Google Cloud Vision API
+-Experimenting with Cozmo's camera and Google Tensorflow Machine Learning framework
+-Use Google's Inception v3 pretrained model
 
 
-@author 
+@author Shazz
+@author Cozplay team for base python framework
 '''
 
 _font = None
@@ -104,7 +100,7 @@ class CozmoSees:
             await self.classify_vision()
             self._is_busy = False
 
-    # Send an image label request using Cozmo's current camera image
+    # Classify the VGA Camera raw image with Tensorflow
     async def classify_vision(self):
         
         await self._robot.set_head_angle(cozmo.util.Angle(degrees=0)).wait_for_completed()
@@ -149,7 +145,7 @@ class CozmoSees:
         pass
 
 
-class CloudVisionCube(cozmo.objects.LightCube):
+class CozmoSeesCube(cozmo.objects.LightCube):
     def __init__(self, *a, **kw):
         super().__init__(*a, **kw)
         self._color = cozmo.lights.off
@@ -165,5 +161,5 @@ class CloudVisionCube(cozmo.objects.LightCube):
 
 if __name__ == '__main__':
     download_classifier()
-    cozmo.world.World.light_cube_factory = CloudVisionCube
+    cozmo.world.World.light_cube_factory = CozmoSeesCube
     CozmoSees()

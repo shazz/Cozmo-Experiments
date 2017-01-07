@@ -37,30 +37,66 @@ except IOError:
     except IOError:
         pass
 
-def test():
-    image1 = Image.open("test2.jpg")
-    #resized_image1 = image1.resize((299, 299), Image.LANCZOS)
-    image1.save("tmp1.jpg", "JPEG")
-	
-    image2 = Image.open("test3.jpg")
-    #resized_image2 = image2.resize((299, 299), Image.LANCZOS)
-    image2.save("tmp2.jpg", "JPEG")
+class CozmoSees:
+    def __init__(self):
+        self._count = 0
+        self._cube = 0
+        self._robot = None
+        self._is_busy = False
+        if USE_LOGGING:
+            cozmo.setup_basic_logging()
+        if USE_VIEWER:
+            cozmo.connect_with_tkviewer(self.run)
+        else:
+            cozmo.connect(self.run)
 
-    image3 = Image.open("test4.jpg")
-    #resized_image3 = image3.resize((299, 299), Image.LANCZOS)
-    image3.save("tmp3.jpg", "JPEG")
+async def set_up_cozmo(self, coz_conn):
+        asyncio.set_event_loop(coz_conn._loop)
+        self._robot = await coz_conn.wait_for_robot()
+        self._robot.camera.image_stream_enabled = True
+        await self._robot.set_head_angle(cozmo.util.Angle(degrees=0)).wait_for_completed()
+        try:
+            cubes = await self._robot.world.wait_until_observe_num_objects(1, cozmo.objects.LightCube)
+            self._cube = cubes[0]
+        except TimeoutError:
+            print("Could not find cube")
+            return False
+        await self._robot.play_anim("anim_reacttoblock_happydetermined_01").wait_for_completed()
+        await self._robot.set_head_angle(cozmo.util.Angle(degrees=44.5)).wait_for_completed()
+        await self._robot.say_text("Hey. Tap the cube and I'll investigate", duration_scalar=1.2).wait_for_completed()
+        await self._robot.set_head_angle(cozmo.util.Angle(degrees=0.0)).wait_for_completed()
+        self._cube.color = PURPLE
+        self._robot.world.add_event_handler(cozmo.objects.EvtObjectTapped, self.on_object_tapped)
 
-    start = time.process_time()	
-    recognized_object, score = run_inference_on_file("tmp1.jpg")
-    print("this is a", recognized_object, "in", (time.process_time()- start), "s with score", score)
-	
-    start = time.process_time()		
-    recognized_object, score = run_inference_on_file("tmp2.jpg")
-    print("this is a", recognized_object, "in", (time.process_time()- start), "s with score", score)
+async def on_object_tapped(self, event, *, obj, tap_count, tap_duration, **kw):
+    if self._is_busy:
+        return
+    else:
+        self._is_busy = True
+        self._cube.color = ORANGE
+        response = await self.send_label_request()
+        if response:
+            await self.process_label_response(response)
+        self._is_busy = False
 
-    start = time.process_time()	
-    recognized_object, score = run_inference_on_file("tmp3.jpg")
-    print("this is a", recognized_object, "in", (time.process_time()- start), "s with score", score)
+
+class CloudVisionCube(cozmo.objects.LightCube):
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self._color = cozmo.lights.off
+
+    @property
+    def color(self):
+        return self._color
+
+    @color.setter
+    def color(self, value: cozmo.lights.Color):
+        self._color = value
+        self.set_lights(cozmo.lights.Light(value))
+
+if __name__ == '__main__':
+    cozmo.world.World.light_cube_factory = CloudVisionCube
+    CozmoSees()        
 
 def make_text_image(text_to_draw, x, y, font=None):
     '''Make a PIL.Image with the given text printed on it
@@ -85,6 +121,14 @@ def make_text_image(text_to_draw, x, y, font=None):
     dc.text((x, y), text_to_draw, fill=(255, 255, 255, 255), font=font)
 
     return text_image
+
+async def run(self, coz_conn):
+    # Set up Cozmo
+    await self.set_up_cozmo(coz_conn)
+
+    while True:
+        await asyncio.sleep(0)
+    pass
 
 def run(sdk_conn):
     '''The run method runs once Cozmo is connected.'''

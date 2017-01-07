@@ -39,13 +39,13 @@ from six.moves import urllib
 import tensorflow as tf
 
 DATA_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
-
 node_lookup = None
 
 class NodeLookup(object):
   """Converts integer node ID's to human readable labels."""
 
   def __init__(self, label_lookup_path=None, uid_lookup_path=None):
+    print('path', label_lookup_path)
     self.node_lookup = self.load(label_lookup_path, uid_lookup_path)
 
   def load(self, label_lookup_path, uid_lookup_path):
@@ -104,14 +104,20 @@ class NodeLookup(object):
 def create_graph(path):
   """Creates a graph from saved GraphDef file and returns a saver."""
   
-  print("Create graph from stored model")
+  print("Create graph from stored model in ", path)
+
   # Creates graph from saved graph_def.pb.
-  global dest_directory
-  
   with tf.gfile.FastGFile(os.path.join(path, 'classify_image_graph_def.pb'), 'rb') as f:
     graph_def = tf.GraphDef()
     graph_def.ParseFromString(f.read())
     _ = tf.import_graph_def(graph_def, name='')
+
+def setup_classifier():
+  create_graph('./imagenet')
+
+  global node_lookup
+  node_lookup = NodeLookup(label_lookup_path=os.path.join('./imagenet', 'imagenet_2012_challenge_label_map_proto.pbtxt'), 
+               uid_lookup_path=os.path.join('./imagenet', 'imagenet_synset_to_human_label_map.txt'))
 
 def run_inference_on_file(filename):
   """Runs inference on an image.
@@ -122,9 +128,6 @@ def run_inference_on_file(filename):
   Returns:
     Most probable recognized object human readable string
   """
-  global node_lookup
-  if node_lookup is None:
-      init_classifier()
 
   if not tf.gfile.Exists(filename):
     tf.logging.fatal('File does not exist %s', filename)
@@ -142,38 +145,37 @@ def run_inference_on_file(filename):
     predictions = np.squeeze(predictions)
     top_k = predictions.argsort()[-5:][::-1]
 
-    #for node_id in top_k:
-    #  human_string = node_lookup.id_to_string(node_id)
-    #  score = predictions[node_id]
-    #  print('This is a %s (%.5f)' % (human_string, score))
-
+    global node_lookup
+    for node_id in top_k:
+      human_string = node_lookup.id_to_string(node_id)
+      score = predictions[node_id]
+      print('Found %s (%.5f)' % (human_string, score))
+    
     return node_lookup.id_to_string(top_k[0]), predictions[top_k[0]]
 
-def init_classifier():
+def download_classifier():
   """Download and extract model tar file."""
-  global node_lookup
 
-  dest_directory = '/tmp/imagenet'
+  dest_directory = './imagenet'
   if not os.path.exists(dest_directory):
     os.makedirs(dest_directory)
+
   filename = DATA_URL.split('/')[-1]
   filepath = os.path.join(dest_directory, filename)
+  print("checking model existence:", filepath)
   if not os.path.exists(filepath):
-     def _progress(count, block_size, total_size):
-      sys.stdout.write('\r>> Downloading %s %.1f%%' % (filename, float(count * block_size) / float(total_size) * 100.0))
+    def _progress(count, block_size, total_size):
+      sys.stdout.write('\r>> Downloading %s %.1f%%' % (
+          filename, float(count * block_size) / float(total_size) * 100.0))
       sys.stdout.flush()
-      filepath, _ = urllib.request.urlretrieve(DATA_URL, filepath, _progress)
-      print()
-      statinfo = os.stat(filepath)
-      print('Successfully downloaded', filename, statinfo.st_size, 'bytes.')
-      tarfile.open(filepath, 'r:gz').extractall(dest_directory)
-      print('Successfully extracted')
+    filepath, _ = urllib.request.urlretrieve(DATA_URL, filepath, _progress)
+    print()
+    statinfo = os.stat(filepath)
+    print('Successfully downloaded', filename, statinfo.st_size, 'bytes.')
+    tarfile.open(filepath, 'r:gz').extractall(dest_directory)
+    print('Successfully extracted')
+  else:
+    print("Inception model already downloaded and extracted")
 
-  # Creates graph from saved GraphDef.
-  create_graph(dest_directory)
-
-  #  Creates node ID --> English string lookup.
-  node_lookup = NodeLookup(label_lookup_path=os.path.join(dest_directory, '/tmp/imagenet/imagenet_2012_challenge_label_map_proto.pbtxt'), 
-      			   uid_lookup_path=os.path.join(dest_directory, '/tmp/imagenet/imagenet_synset_to_human_label_map.txt'))
 
 

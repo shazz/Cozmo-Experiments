@@ -1,8 +1,7 @@
 # Cozmo-Experiments
 My experiments using AI (Tensorflow, scikit learn...) and Robotics (Cozmo)
 
-### Cosmo Sees... (https://github.com/shazz/Cozmo-Experiments/tree/master/Cosmo-sees)
-
+### [Cozmo Sees...](https://github.com/shazz/Cozmo-Experiments/tree/master/Cozmo-sees "Cozmo Sees...")
 A first try to integrate Google's Tensorflow and Cozmo, using the Inception v3 model, Cozmo can classify what he sees.
 
 ### ?

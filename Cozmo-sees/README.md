@@ -19,6 +19,10 @@ That should be fine...
 
 ### Run
 
-`python3 cozmo_classify.py`
+Hint: Como needs a cube in his range
+
+`python3 cozmo_sees.py`
+
+Then, when Cozmo will tell you, tap the purple cube to ask Cozmo what he sees
  
  
